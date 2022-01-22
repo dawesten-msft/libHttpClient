@@ -104,6 +104,12 @@ STDAPI HCMemGetFunctions(
     _Out_ HCMemFreeFunction* memFreeFunc
     ) noexcept;
 
+#if HC_PLATFORM == HC_PLATFORM_ANDROID
+typedef jclass (STDAPIVCALLTYPE* HCFindClassDelegate) (
+    _In_ JNIEnv* jniEnv,
+    _In_ const char* className
+    );
+#endif
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Global APIs
@@ -118,6 +124,8 @@ typedef struct HCInitArgs {
     JavaVM *javaVM;
     /// <summary>The Java Application Context.</summary>
     jobject applicationContext;
+    /// <summary>Optional FindClass delegate function.</summary>
+    HCFindClassDelegate findClassDelegate = nullptr;
 } HCInitArgs;
 #else 
 /// <summary>

@@ -18,20 +18,28 @@ Result<std::shared_ptr<AndroidPlatformContext>> AndroidPlatformContext::Initiali
     // to the classes we will use for making HTTP requests.
     jint result = javaVm->GetEnv(reinterpret_cast<void**>(&jniEnv), JNI_VERSION_1_6);
 
+    if (!args->findClassDelegate)
+    {
+        args->findClassDelegate = [](JNIEnv* env, char const* className)
+        {
+            return env->FindClass(className);
+        };
+    }
+
     if (result != JNI_OK)
     {
         HC_TRACE_ERROR(HTTPCLIENT, "Failed to initialize because JavaVM is not attached to a java thread.");
         return E_FAIL;
     }
 
-    jclass localHttpRequest = jniEnv->FindClass("com/xbox/httpclient/HttpClientRequest");
+    jclass localHttpRequest = args->findClassDelegate(jniEnv, "com/xbox/httpclient/HttpClientRequest");
     if (localHttpRequest == nullptr)
     {
         HC_TRACE_ERROR(HTTPCLIENT, "Could not find HttpClientRequest class");
         return E_FAIL;
     }
 
-    jclass localHttpResponse = jniEnv->FindClass("com/xbox/httpclient/HttpClientResponse");
+    jclass localHttpResponse = args->findClassDelegate(jniEnv, "com/xbox/httpclient/HttpClientResponse");
     if (localHttpResponse == nullptr)
     {
         HC_TRACE_ERROR(HTTPCLIENT, "Could not find HttpClientResponse class");
