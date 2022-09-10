@@ -39,14 +39,23 @@ HRESULT Internal_InitializeHttpPlatform(HCInitArgs* args, PerformEnv& performEnv
         return E_FAIL;
     }
 
+    jclass localWebSocket = jniEnv->FindClass("com/xbox/httpclient/HttpClientWebSocket");
+    if (localWebSocket == nullptr)
+    {
+        HC_TRACE_ERROR(HTTPCLIENT, "Could not find HttpClientWebSocket class");
+        return E_FAIL;
+    }
+
     jclass globalRequestClass = reinterpret_cast<jclass>(jniEnv->NewGlobalRef(localHttpRequest));
     jclass globalResponseClass = reinterpret_cast<jclass>(jniEnv->NewGlobalRef(localHttpResponse));
+    jclass globalWebSocketClass = reinterpret_cast<jclass>(jniEnv->NewGlobalRef(localWebSocket));
 
     performEnv.reset(new (std::nothrow) HC_PERFORM_ENV(
         javaVm,
         args->applicationContext,
         globalRequestClass,
-        globalResponseClass
+        globalResponseClass,
+        globalWebSocketClass
     ));
     if (!performEnv) { return E_OUTOFMEMORY; }
 
@@ -58,11 +67,12 @@ void Internal_CleanupHttpPlatform(HC_PERFORM_ENV* performEnv) noexcept
     delete performEnv;
 }
 
-HC_PERFORM_ENV::HC_PERFORM_ENV(JavaVM* javaVm, jobject applicationContext, jclass requestClass, jclass responseClass) :
+HC_PERFORM_ENV::HC_PERFORM_ENV(JavaVM* javaVm, jobject applicationContext, jclass requestClass, jclass responseClass, jclass webSocketClass) :
     m_javaVm{ javaVm },
     m_applicationContext{ applicationContext },
     m_httpRequestClass{ requestClass },
-    m_httpResponseClass{ responseClass }
+    m_httpResponseClass{ responseClass },
+    m_webSocketClass{ webSocketClass }
 {
     assert(m_javaVm != nullptr);
 }
