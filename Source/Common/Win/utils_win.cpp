@@ -8,6 +8,7 @@
 #include <httpClient/trace.h>
 #if !HC_XDK_API && !HC_UWP_API
 #include <winhttp.h>
+#include <VersionHelpers.h>
 #endif
 
 http_internal_string utf8_from_utf16(const http_internal_wstring& utf16)
@@ -125,6 +126,11 @@ proxy_type get_ie_proxy_info(_In_ proxy_protocol protocol, _Inout_ xbox::httpcli
     proxy_type proxyType = proxy_type::automatic_proxy;
 
 #if HC_PLATFORM != HC_PLATFORM_GDK
+    if (IsWindows8Point1OrGreater())
+    {
+        return proxyType;
+    }
+
     WINHTTP_CURRENT_USER_IE_PROXY_CONFIG config = { 0 };
     if (!WinHttpGetIEProxyConfigForCurrentUser(&config))
     {
