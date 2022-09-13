@@ -184,6 +184,33 @@ enum class WinHttpWebsockState
 };
 #endif
 
+struct WinHttpWebSocketExports
+{
+    using CompleteUpgrade = HINTERNET(WINAPI*)(HINTERNET, DWORD_PTR);
+    using SocketSend = DWORD(WINAPI*)(HINTERNET, UINT, PVOID, DWORD);
+    using Receive = DWORD(WINAPI*)(HINTERNET, PVOID, DWORD, DWORD*, UINT*);
+    using Close = DWORD(WINAPI*)(HINTERNET, USHORT, PVOID, DWORD);
+    using QueryCloseStatus = DWORD(WINAPI*)(HINTERNET, USHORT*, PVOID, DWORD, DWORD*);
+    using Shutdown = DWORD(WINAPI*)(HINTERNET, USHORT, PVOID, DWORD);
+
+    static const WinHttpWebSocketExports& Get();
+
+    bool IsAvailable() const;
+
+    HMODULE winHttpModule = nullptr;
+    CompleteUpgrade completeUpgrade = nullptr;
+    SocketSend send = nullptr;
+    Receive receive = nullptr;
+    Close close = nullptr;
+    QueryCloseStatus queryCloseStatus = nullptr;
+    Shutdown shutdown = nullptr;
+
+private:
+    WinHttpWebSocketExports();
+    ~WinHttpWebSocketExports();
+};
+
+
 class winhttp_http_task : public xbox::httpclient::hc_task
 {
 public:
@@ -323,6 +350,7 @@ private:
     win32_cs m_lock;
     bool m_isWebSocket = false;
     bool m_isSecure = false;
+    const WinHttpWebSocketExports& m_winHttpWebSocketExports;
 
 #if HC_WINHTTP_WEBSOCKETS
     // websocket state

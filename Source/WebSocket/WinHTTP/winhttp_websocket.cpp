@@ -14,6 +14,7 @@
 #include "../../HTTP/Curl/CurlProvider.h"
 #else
 #include "../../HTTP/WinHttp/winhttp_http_provider.h"
+#include "../../HTTP/WinHttp/winhttp_http_task.h"
 #endif
 
 using namespace xbox::httpclient;
@@ -309,7 +310,7 @@ private:
     std::recursive_mutex m_mutex;
 };
 
-HRESULT CALLBACK Internal_HCWebSocketConnectAsync(
+HRESULT CALLBACK winhttp_ConnectAsync(
     _In_z_ const char* uri,
     _In_z_ const char* subProtocol,
     _In_ HCWebsocketHandle websocket,
@@ -339,7 +340,7 @@ HRESULT CALLBACK Internal_HCWebSocketConnectAsync(
     return impl->connect_websocket(websocket, asyncBlock, env->winHttpState);
 }
 
-HRESULT CALLBACK Internal_HCWebSocketSendMessageAsync(
+HRESULT CALLBACK winhttp_SendMessageAsync(
     _In_ HCWebsocketHandle websocket,
     _In_z_ const char* message,
     _Inout_ XAsyncBlock* async,
@@ -359,7 +360,7 @@ HRESULT CALLBACK Internal_HCWebSocketSendMessageAsync(
     return httpSocket->send_websocket_message_async(async, message);
 }
 
-HRESULT CALLBACK Internal_HCWebSocketSendBinaryMessageAsync(
+HRESULT CALLBACK winhttp_SendBinaryMessageAsync(
     _In_ HCWebsocketHandle websocket,
     _In_reads_bytes_(payloadSize) const uint8_t* payloadBytes,
     _In_ uint32_t payloadSize,
@@ -379,7 +380,7 @@ HRESULT CALLBACK Internal_HCWebSocketSendBinaryMessageAsync(
     return httpSocket->send_websocket_binary_message_async(asyncBlock, payloadBytes, payloadSize);
 }
 
-HRESULT CALLBACK Internal_HCWebSocketDisconnect(
+HRESULT CALLBACK winhttp_Disconnect(
     _In_ HCWebsocketHandle websocket,
     _In_ HCWebSocketCloseStatus closeStatus,
     _In_opt_ void* /*context*/
@@ -397,6 +398,94 @@ HRESULT CALLBACK Internal_HCWebSocketDisconnect(
     }
     HC_TRACE_INFORMATION(WEBSOCKET, "Websocket [ID %llu]: disconnecting", TO_ULL(websocket->id));
     return httpSocket->disconnect_websocket(closeStatus);
+}
+
+HRESULT CALLBACK websocketpp_ConnectAsync(
+    _In_z_ const char* uri,
+    _In_z_ const char* subProtocol,
+    _In_ HCWebsocketHandle websocket,
+    _Inout_ XAsyncBlock* async,
+    _In_opt_ void* context,
+    _In_ HCPerformEnv env
+);
+
+HRESULT CALLBACK websocketpp_SendMessageAsync(
+    _In_ HCWebsocketHandle websocket,
+    _In_z_ const char* message,
+    _Inout_ XAsyncBlock* async,
+    _In_opt_ void* context
+);
+
+HRESULT CALLBACK websocketpp_SendBinaryMessageAsync(
+    _In_ HCWebsocketHandle websocket,
+    _In_reads_bytes_(payloadSize) const uint8_t* payloadBytes,
+    _In_ uint32_t payloadSize,
+    _Inout_ XAsyncBlock* asyncBlock,
+    _In_opt_ void* context
+);
+
+HRESULT CALLBACK websocketpp_Disconnect(
+    _In_ HCWebsocketHandle websocket,
+    _In_ HCWebSocketCloseStatus closeStatus,
+    _In_opt_ void* context
+);
+
+HRESULT CALLBACK Internal_HCWebSocketConnectAsync(
+    _In_z_ const char* uri,
+    _In_z_ const char* subProtocol,
+    _In_ HCWebsocketHandle websocket,
+    _Inout_ XAsyncBlock* asyncBlock,
+    _In_opt_ void* context,
+    _In_ HCPerformEnv env
+)
+{
+    if (WinHttpWebSocketExports::Get().IsAvailable())
+    {
+        return winhttp_ConnectAsync(uri, subProtocol, websocket, asyncBlock, context, env);
+    }
+    return websocketpp_ConnectAsync(uri, subProtocol, websocket, asyncBlock, context, env);
+}
+
+HRESULT CALLBACK Internal_HCWebSocketSendMessageAsync(
+    _In_ HCWebsocketHandle websocket,
+    _In_z_ const char* message,
+    _Inout_ XAsyncBlock* asyncBlock,
+    _In_opt_ void* context
+)
+{
+    if (WinHttpWebSocketExports::Get().IsAvailable())
+    {
+        return winhttp_SendMessageAsync(websocket, message, asyncBlock, context);
+    }
+    return websocketpp_SendMessageAsync(websocket, message, asyncBlock, context);
+}
+
+HRESULT CALLBACK Internal_HCWebSocketSendBinaryMessageAsync(
+    _In_ HCWebsocketHandle websocket,
+    _In_reads_bytes_(payloadSize) const uint8_t* payloadBytes,
+    _In_ uint32_t payloadSize,
+    _Inout_ XAsyncBlock* asyncBlock,
+    _In_opt_ void* context
+)
+{
+    if (WinHttpWebSocketExports::Get().IsAvailable())
+    {
+        return winhttp_SendBinaryMessageAsync(websocket, payloadBytes, payloadSize, asyncBlock, context);
+    }
+    return websocketpp_SendBinaryMessageAsync(websocket, payloadBytes, payloadSize, asyncBlock, context);
+}
+
+HRESULT CALLBACK Internal_HCWebSocketDisconnect(
+    _In_ HCWebsocketHandle websocket,
+    _In_ HCWebSocketCloseStatus closeStatus,
+    _In_opt_ void* context
+)
+{
+    if (WinHttpWebSocketExports::Get().IsAvailable())
+    {
+        return winhttp_Disconnect(websocket, closeStatus, context);
+    }
+    return websocketpp_Disconnect(websocket, closeStatus, context);
 }
 
 #endif

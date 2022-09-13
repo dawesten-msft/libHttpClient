@@ -3,7 +3,7 @@
 
 #include "pch.h"
 
-#if !HC_NOWEBSOCKETS && !HC_WINHTTP_WEBSOCKETS
+#if !HC_NOWEBSOCKETS
 
 #include "../hcwebsocket.h"
 #include "uri.h"
@@ -896,7 +896,7 @@ private:
     http_internal_string m_subprotocol;
 };
 
-HRESULT CALLBACK Internal_HCWebSocketConnectAsync(
+HRESULT CALLBACK websocketpp_ConnectAsync(
     _In_z_ const char* uri,
     _In_z_ const char* subProtocol,
     _In_ HCWebsocketHandle websocket,
@@ -918,7 +918,7 @@ HRESULT CALLBACK Internal_HCWebSocketConnectAsync(
     return wsppSocket->connect(async);
 }
 
-HRESULT CALLBACK Internal_HCWebSocketSendMessageAsync(
+HRESULT CALLBACK websocketpp_SendMessageAsync(
     _In_ HCWebsocketHandle websocket,
     _In_z_ const char* message,
     _Inout_ XAsyncBlock* async,
@@ -934,7 +934,7 @@ HRESULT CALLBACK Internal_HCWebSocketSendMessageAsync(
     return wsppSocket->send(async, message);
 }
 
-HRESULT CALLBACK Internal_HCWebSocketSendBinaryMessageAsync(
+HRESULT CALLBACK websocketpp_SendBinaryMessageAsync(
     _In_ HCWebsocketHandle websocket,
     _In_reads_bytes_(payloadSize) const uint8_t* payloadBytes,
     _In_ uint32_t payloadSize,
@@ -951,7 +951,7 @@ HRESULT CALLBACK Internal_HCWebSocketSendBinaryMessageAsync(
     return wsppSocket->sendBinary(asyncBlock, payloadBytes, payloadSize);
 }
 
-HRESULT CALLBACK Internal_HCWebSocketDisconnect(
+HRESULT CALLBACK websocketpp_Disconnect(
     _In_ HCWebsocketHandle websocket,
     _In_ HCWebSocketCloseStatus closeStatus,
     _In_opt_ void* context
@@ -973,4 +973,4 @@ HRESULT CALLBACK Internal_HCWebSocketDisconnect(
     return wsppSocket->close(closeStatus);
 }
 
-#endif // !HC_NOWEBSOCKETS && !HC_WINHTTP_WEBSOCKETS
+#endif // !HC_NOWEBSOCKETS
