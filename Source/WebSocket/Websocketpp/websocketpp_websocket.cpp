@@ -433,9 +433,8 @@ private:
         {
             // On windows platforms use the IE proxy if the user didn't specify one
             Uri proxyUri;
-            auto proxyType = get_ie_proxy_info(proxy_protocol::websocket, proxyUri);
-
-            if (proxyType == proxy_type::named_proxy)
+            proxy_protocol protocol = m_uri.IsSecure() ? proxy_protocol::https : proxy_protocol::http;
+            if (get_proxy_for_uri(protocol, m_uri, &proxyUri))
             {
                 con->set_proxy(proxyUri.FullPath().data(), ec);
                 if (ec)

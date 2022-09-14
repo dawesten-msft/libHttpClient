@@ -9,6 +9,7 @@
 #if !HC_XDK_API && !HC_UWP_API
 #include <winhttp.h>
 #include <VersionHelpers.h>
+#include "../../HTTP/WinHttp/winhttp_http_provider.h"
 #endif
 
 http_internal_string utf8_from_utf16(const http_internal_wstring& utf16)
@@ -121,6 +122,14 @@ http_internal_wstring utf16_from_utf8(_In_reads_(size) const char* utf8, size_t 
 
 NAMESPACE_XBOX_HTTP_CLIENT_BEGIN
 
+static http_internal_unordered_map<proxy_protocol, http_internal_wstring> protocolsMap =
+{
+    { proxy_protocol::http, L"http" },
+    { proxy_protocol::https, L"https" },
+    { proxy_protocol::websocket, L"socks" },
+    { proxy_protocol::ftp, L"ftp" }
+};
+
 proxy_type get_ie_proxy_info(_In_ proxy_protocol protocol, _Inout_ xbox::httpclient::Uri& proxyUri)
 {
     proxy_type proxyType = proxy_type::automatic_proxy;
@@ -153,14 +162,6 @@ proxy_type get_ie_proxy_info(_In_ proxy_protocol protocol, _Inout_ xbox::httpcli
         }
         else
         {
-            static http_internal_unordered_map<proxy_protocol, http_internal_wstring> protocolsMap =
-            {
-                { proxy_protocol::http, L"http" },
-                { proxy_protocol::https, L"https" },
-                { proxy_protocol::websocket, L"socks" },
-                { proxy_protocol::ftp, L"ftp" }
-            };
-
             auto protocolString = protocolsMap[protocol];
 
             auto pos = proxyConfig.find(protocolString);
@@ -192,6 +193,110 @@ proxy_type get_ie_proxy_info(_In_ proxy_protocol protocol, _Inout_ xbox::httpcli
 #endif
 
     return proxyType;
+}
+
+bool convert_proxy_info(_In_ proxy_protocol protocol, _In_ WINHTTP_PROXY_INFO* proxyInfo, _Out_ xbox::httpclient::Uri* outProxyUri)
+{
+    if (!proxyInfo->lpszProxy)
+    {
+        return false;
+    }
+
+    http_internal_wstring proxyAddress;
+
+    // something like "http=127.0.0.1:8888;https=127.0.0.1:8888", or "localhost:80"
+    http_internal_wstring proxyConfig = proxyInfo->lpszProxy;
+    if (proxyConfig.find(L"=") == http_internal_wstring::npos)
+    {
+        proxyAddress = proxyConfig;
+    }
+    else
+    {
+        auto protocolString = protocolsMap[protocol];
+
+        auto pos = proxyConfig.find(protocolString);
+        if (pos != http_internal_wstring::npos)
+        {
+            proxyAddress = proxyConfig.substr(pos + protocolString.length() + 1);
+            proxyAddress = proxyAddress.substr(0, proxyConfig.find(';', pos));
+        }
+    }
+
+    if (proxyAddress.empty())
+    {
+        return false;
+    }
+
+    if (proxyAddress.find(L"://") == http_internal_wstring::npos)
+    {
+        proxyAddress = protocolsMap[protocol] + proxyAddress;
+    }
+
+    *outProxyUri = Uri(utf8_from_utf16(proxyAddress));
+    return true;
+}
+
+bool get_proxy_for_uri(_In_ proxy_protocol protocol, _In_ const xbox::httpclient::Uri& uri, _Out_ xbox::httpclient::Uri* outProxyUri)
+{
+#if !HC_XDK_API && !HC_UWP_API
+    auto singleton = xbox::httpclient::get_http_singleton();
+    if (!singleton || !singleton->m_performEnv)
+    {
+        return false;
+    }
+
+    auto winhttpState = singleton->m_performEnv->winHttpState;
+    if (!winhttpState)
+    {
+        return false;
+    }
+
+    uint32_t securityFlags = winhttpState->GetDefaultHttpSecurityProtocolFlagsForWin7();
+    HINTERNET hSession = winhttpState->GetSessionForHttpSecurityProtocolFlags(securityFlags);
+    if (!hSession)
+    {
+        return false;
+    }
+
+    WINHTTP_AUTOPROXY_OPTIONS options = { 0 };
+    options.dwFlags = WINHTTP_AUTOPROXY_ALLOW_AUTOCONFIG | WINHTTP_AUTOPROXY_ALLOW_CM | WINHTTP_AUTOPROXY_ALLOW_STATIC;
+    options.fAutoLogonIfChallenged = FALSE;
+
+    LPWSTR autoConfigUrl = nullptr;
+    if (WinHttpDetectAutoProxyConfigUrl(options.dwAutoDetectFlags, &autoConfigUrl) && autoConfigUrl)
+    {
+        options.dwFlags |= WINHTTP_AUTOPROXY_CONFIG_URL;
+        options.lpszAutoConfigUrl = autoConfigUrl;
+    }
+    else
+    {
+        options.dwFlags |= WINHTTP_AUTOPROXY_AUTO_DETECT;
+        options.dwAutoDetectFlags = WINHTTP_AUTO_DETECT_TYPE_DHCP | WINHTTP_AUTO_DETECT_TYPE_DNS_A;
+    }
+
+    http_internal_wstring wideUri = protocolsMap[protocol];
+    wideUri += L"://";
+    wideUri += utf16_from_utf8(uri.Authority());
+    wideUri += utf16_from_utf8(uri.Resource());
+
+    WINHTTP_PROXY_INFO proxyInfo = { 0 };
+    if (!WinHttpGetProxyForUrl(hSession, wideUri.c_str(), &options, &proxyInfo))
+    {
+        if (GetLastError() == ERROR_WINHTTP_LOGIN_FAILURE)
+        {
+            options.fAutoLogonIfChallenged = TRUE;
+            if (WinHttpGetProxyForUrl(hSession, wideUri.c_str(), &options, &proxyInfo))
+            {
+                return convert_proxy_info(protocol, &proxyInfo, outProxyUri);
+            }
+        }
+        return false;
+    }
+
+    return convert_proxy_info(protocol, &proxyInfo, outProxyUri);
+#else
+    return false;
+#endif
 }
 
 NAMESPACE_XBOX_HTTP_CLIENT_END

@@ -38,6 +38,8 @@ enum class proxy_protocol
 
 proxy_type get_ie_proxy_info(_In_ proxy_protocol protocol, _Inout_ xbox::httpclient::Uri& proxyUri);
 
+bool get_proxy_for_uri(_In_ proxy_protocol protocol, _In_ const xbox::httpclient::Uri& uri, _Out_ xbox::httpclient::Uri* outProxyUri);
+
 NAMESPACE_XBOX_HTTP_CLIENT_END
 
 #endif
